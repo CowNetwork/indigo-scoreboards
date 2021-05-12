@@ -7,7 +7,7 @@
   <groupId>network.cow.mc</groupId>
   <artifactId>indigo-scoreboards</artifactId>
   <packaging>jar</packaging>
-  <version>0.2.0</version>
+  <version>0.2.1</version>
 
   <properties>
     <maven.compiler.source>11</maven.compiler.source>

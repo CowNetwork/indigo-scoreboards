@@ -8,10 +8,10 @@ import network.cow.indigo.client.spigot.api.IndigoService
 import network.cow.indigo.client.spigot.api.event.RolesUpdateEvent
 import network.cow.mooapis.indigo.v1.Role
 import org.bukkit.Bukkit
+import org.bukkit.ChatColor
 import org.bukkit.Color
 import org.bukkit.event.Listener
 import org.bukkit.plugin.java.JavaPlugin
-import org.bukkit.scoreboard.Scoreboard
 import org.bukkit.scoreboard.Team
 import java.util.UUID
 
@@ -27,7 +27,27 @@ class IndigoScoreboardsPlugin : JavaPlugin(), Listener {
     internal val displayedRoles = mutableMapOf<UUID, ScoreboardRole>()
 
     override fun onEnable() {
-        this.scoreboardsConfig = IndigoScoreboardsConfig(this.config.getString("defaultColor", "000000")!!)
+        val roleConfigMap = mutableMapOf<String, IndigoScoreboardsConfig.Role>()
+        this.config.getList("teams")?.forEach {
+            it as Map<*, *>
+
+            val roleName = it["role"]?.toString()
+            val prefix = it.getOrDefault("prefix", "").toString()
+            val userColor = it.getOrDefault("color", "FFFFFF").toString()
+            val suffix = it.getOrDefault("suffix", "").toString()
+
+            if (roleName == null) return@forEach
+
+            val roleConfig = IndigoScoreboardsConfig.Role(
+                roleName, prefix, userColor, suffix,
+            )
+            roleConfigMap[roleName] = roleConfig
+        }
+
+        this.scoreboardsConfig = IndigoScoreboardsConfig(
+            this.config.getString("defaultColor", "FFFFFF")!!,
+            roleConfigMap
+        )
 
         Bukkit.getPluginManager().registerEvents(ScoreboardListener(this), this)
 
@@ -55,17 +75,24 @@ class IndigoScoreboardsPlugin : JavaPlugin(), Listener {
         }
     }
 
-    private fun createTeam(scoreboard: Scoreboard, role: Role): Team {
-        val teamName = this.getTeamName(role)
-        val team = scoreboard.registerNewTeam(teamName)
+    private fun applyConfigToTeam(team: Team, role: Role) {
+        val roleConfig = this.scoreboardsConfig.roleConfigs[role.name] ?: IndigoScoreboardsConfig.Role(
+            role.name, role.name + " ", "", ""
+        )
 
-        val color = role.color.toColor()
-        val bukkitColor = NamedTextColor.nearestTo(TextColor.color(color.red, color.green, color.blue))
+        val color = roleConfig.userColor.ifEmpty { role.color }
+        val bukkitColor = color.toNamedTextColor()
 
-        team.color(NamedTextColor.GRAY)
-        team.prefix(Component.text(role.name + " ", bukkitColor))
+        team.color(bukkitColor)
 
-        return team
+        if (roleConfig.prefix.isNotEmpty()) {
+            val prefix = roleConfig.prefix.replace("%roleColor%", role.color.toNamedTextColor().toChatColor().toString())
+            team.prefix(Component.text(prefix))
+        }
+        if (roleConfig.suffix.isNotEmpty()) {
+            val suffix = roleConfig.suffix.replace("%roleColor%", role.color.toNamedTextColor().toChatColor().toString())
+            team.suffix(Component.text(suffix))
+        }
     }
 
     private fun getTeamName(role: Role): String {
@@ -83,7 +110,9 @@ class IndigoScoreboardsPlugin : JavaPlugin(), Listener {
                     return
                 }
 
-                val team = this.createTeam(scoreboard, role)
+                val teamName = this.getTeamName(role)
+                val team = scoreboard.registerNewTeam(teamName)
+                this.applyConfigToTeam(team, role)
 
                 val scoreboardRole = ScoreboardRole(role, team)
                 displayableRoles[role.id] = scoreboardRole
@@ -105,11 +134,7 @@ class IndigoScoreboardsPlugin : JavaPlugin(), Listener {
                     return
                 }
 
-                val color = role.color.toColor()
-                val bukkitColor = NamedTextColor.nearestTo(TextColor.color(color.red, color.green, color.blue))
-
-                team.color(NamedTextColor.GRAY)
-                team.prefix(Component.text(role.name + " ", bukkitColor))
+                this.applyConfigToTeam(team, role)
             }
         }
     }
@@ -128,6 +153,33 @@ class IndigoScoreboardsPlugin : JavaPlugin(), Listener {
             )
         } catch (ex: Exception) {
             Color.WHITE
+        }
+    }
+
+    private fun String.toNamedTextColor(): NamedTextColor {
+        val color = this.toColor()
+        return NamedTextColor.nearestTo(TextColor.color(color.red, color.green, color.blue))
+    }
+
+    private fun NamedTextColor.toChatColor(): ChatColor {
+        return when (this) {
+            NamedTextColor.BLACK -> ChatColor.BLACK
+            NamedTextColor.DARK_BLUE -> ChatColor.DARK_BLUE
+            NamedTextColor.DARK_GREEN -> ChatColor.DARK_GREEN
+            NamedTextColor.DARK_AQUA -> ChatColor.DARK_AQUA
+            NamedTextColor.DARK_RED -> ChatColor.DARK_RED
+            NamedTextColor.DARK_PURPLE -> ChatColor.DARK_PURPLE
+            NamedTextColor.GOLD -> ChatColor.GOLD
+            NamedTextColor.GRAY -> ChatColor.GRAY
+            NamedTextColor.DARK_GRAY -> ChatColor.DARK_GRAY
+            NamedTextColor.BLUE -> ChatColor.BLUE
+            NamedTextColor.GREEN -> ChatColor.GREEN
+            NamedTextColor.AQUA -> ChatColor.AQUA
+            NamedTextColor.RED -> ChatColor.RED
+            NamedTextColor.LIGHT_PURPLE -> ChatColor.LIGHT_PURPLE
+            NamedTextColor.YELLOW -> ChatColor.YELLOW
+            NamedTextColor.WHITE -> ChatColor.WHITE
+            else -> ChatColor.RESET
         }
     }
 
