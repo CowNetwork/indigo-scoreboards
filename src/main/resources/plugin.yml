@@ -1,0 +1,6 @@
+name: IndigoScoreboards
+version: ${project.version}
+main: network.cow.mc.indigo.scoreboards.IndigoScoreboardsPlugin
+author: Tobias B.
+api-version: 1.16
+depend: [Indigo]
